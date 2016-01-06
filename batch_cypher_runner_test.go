@@ -8,10 +8,10 @@ import (
 	"time"
 )
 
-func TestBatchByCount(t *testing.T) {
+func TestAllQueriesRun(t *testing.T) {
 	assert := assert.New(t)
 	mr := &mockRunner{}
-	batchCypherRunner := NewBatchCypherRunner(mr, 3, time.Millisecond*20)
+	batchCypherRunner := NewBatchCypherRunner(mr, 3)
 
 	errCh := make(chan error)
 
@@ -23,7 +23,7 @@ func TestBatchByCount(t *testing.T) {
 	}()
 
 	go func() {
-		time.Sleep(time.Millisecond * 10)
+		time.Sleep(time.Millisecond * 1)
 		errCh <- batchCypherRunner.CypherBatch([]*neoism.CypherQuery{
 			&neoism.CypherQuery{Statement: "Third"},
 		})
@@ -43,10 +43,11 @@ func TestBatchByCount(t *testing.T) {
 	assert.Equal(expected, mr.queriesRun, "queries didn't match")
 }
 
-func TestBatchByTimeout(t *testing.T) {
+func TestQueryBatching(t *testing.T) {
 	assert := assert.New(t)
-	mr := &mockRunner{}
-	batchCypherRunner := NewBatchCypherRunner(mr, 3, time.Millisecond*20)
+
+	dr := &delayRunner{make(chan []*neoism.CypherQuery)}
+	batchCypherRunner := NewBatchCypherRunner(dr, 3)
 
 	errCh := make(chan error)
 
@@ -56,26 +57,43 @@ func TestBatchByTimeout(t *testing.T) {
 		})
 	}()
 
-	timer := time.NewTimer(time.Millisecond * 10)
+	go func() {
+		time.Sleep(time.Millisecond * 1)
+		errCh <- batchCypherRunner.CypherBatch([]*neoism.CypherQuery{
+			&neoism.CypherQuery{Statement: "Second"},
+		})
+	}()
 
-	select {
-	case <-timer.C:
-		assert.NoError(<-errCh, "Got an error") //expect the timer to expire first, so check we didn't get an error
-	case <-errCh:
-		t.Fatal("Processed query ahead of timeout")
-	}
+	go func() {
+		time.Sleep(time.Millisecond * 2)
+		errCh <- batchCypherRunner.CypherBatch([]*neoism.CypherQuery{
+			&neoism.CypherQuery{Statement: "Third"},
+		})
+	}()
 
-	expected := []*neoism.CypherQuery{
+	time.Sleep(3 * time.Millisecond)
+	// first should have completed, second and third should be queued for next batch
+
+	assert.Equal([]*neoism.CypherQuery{
 		&neoism.CypherQuery{Statement: "First"},
+	}, <-dr.queriesRun)
+
+	assert.Equal([]*neoism.CypherQuery{
+		&neoism.CypherQuery{Statement: "Second"},
+		&neoism.CypherQuery{Statement: "Third"},
+	}, <-dr.queriesRun)
+
+	for i := 0; i < 3; i++ {
+		err := <-errCh
+		assert.NoError(err, "Got an error for %d", i)
 	}
 
-	assert.Equal(expected, mr.queriesRun, "queries didn't match")
 }
 
 func TestEveryoneGetsErrorOnFailure(t *testing.T) {
 	assert := assert.New(t)
 	mr := &failRunner{}
-	batchCypherRunner := NewBatchCypherRunner(mr, 3, time.Millisecond*20)
+	batchCypherRunner := NewBatchCypherRunner(mr, 3)
 
 	errCh := make(chan error)
 
@@ -105,10 +123,7 @@ type mockRunner struct {
 }
 
 func (mr *mockRunner) CypherBatch(queries []*neoism.CypherQuery) error {
-	if mr.queriesRun != nil {
-		return errors.New("Should not have any queries waiting")
-	}
-	mr.queriesRun = queries
+	mr.queriesRun = append(mr.queriesRun, queries...)
 	return nil
 }
 
@@ -117,4 +132,13 @@ type failRunner struct {
 
 func (mr *failRunner) CypherBatch(queries []*neoism.CypherQuery) error {
 	return errors.New("UNIT TESTING: Deliberate fail for every query")
+}
+
+type delayRunner struct {
+	queriesRun chan []*neoism.CypherQuery
+}
+
+func (dr *delayRunner) CypherBatch(queries []*neoism.CypherQuery) error {
+	dr.queriesRun <- queries
+	return nil
 }
