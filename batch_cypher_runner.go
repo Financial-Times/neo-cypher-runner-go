@@ -1,12 +1,14 @@
 package neocypherrunner
 
 import (
+	"fmt"
 	"github.com/jmcvetta/neoism"
 	"github.com/rcrowley/go-metrics"
 	"log"
 )
 
 type CypherRunner interface {
+	fmt.Stringer
 	CypherBatch(queries []*neoism.CypherQuery) error
 }
 
@@ -76,4 +78,8 @@ func (bcr *BatchCypherRunner) batcher() {
 		currentQueries = currentQueries[0:0] // clears the slice
 		currentErrorChannels = currentErrorChannels[0:0]
 	}
+}
+
+func (bcr *BatchCypherRunner) String() string {
+	return fmt.Sprintf("BatchCypherRunner(%s)", bcr.cr.String())
 }
