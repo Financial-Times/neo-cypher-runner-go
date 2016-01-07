@@ -73,7 +73,7 @@ func TestQueryBatching(t *testing.T) {
 
 	time.Sleep(3 * time.Millisecond)
 
-	// Only "First" can have finished because delayRunner is blocking the others until we read from it's channel.
+	// Only "First" can have finished because delayRunner is blocking the others until we read from its channel.
 	assert.Equal([]*neoism.CypherQuery{
 		&neoism.CypherQuery{Statement: "First"},
 	}, <-dr.queriesRun)
