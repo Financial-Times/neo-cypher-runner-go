@@ -7,7 +7,7 @@ import "github.com/Financial-Times/neo-cypher-runner-go"
 
 Create a batch cypher runner like this:
 
-    cypherRunner := neocypherrunner.NewBatchCypherRunner(db, batchSize, time.Millisecond*time.Duration(timeoutMs))
+    cypherRunner := neocypherrunner.NewBatchCypherRunner(db, maxBatchSize)
 
 Execute a batch of queries like this:
 
