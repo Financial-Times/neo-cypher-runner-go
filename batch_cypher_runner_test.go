@@ -72,12 +72,13 @@ func TestQueryBatching(t *testing.T) {
 	}()
 
 	time.Sleep(3 * time.Millisecond)
-	// first should have completed, second and third should be queued for next batch
 
+	// Only "First" can have finished because delayRunner is blocking the others until we read from it's channel.
 	assert.Equal([]*neoism.CypherQuery{
 		&neoism.CypherQuery{Statement: "First"},
 	}, <-dr.queriesRun)
 
+	// because of the time.Sleep() calls earlier, these should both be ready by now.
 	assert.Equal([]*neoism.CypherQuery{
 		&neoism.CypherQuery{Statement: "Second"},
 		&neoism.CypherQuery{Statement: "Third"},
