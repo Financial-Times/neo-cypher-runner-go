@@ -1,4 +1,19 @@
 # neo-cypher-runner-go
+
+
+THIS LIBRARY IS OBSOLETE
+
+THE CODE THAT WAS IN IT HAS MOVED TO   Financial-Times/neo-utils-go
+
+
+
+
+
+
+
+
+
+
 Go library for running cypher against Neo4j.
 
 Currently supports batch running of queries.
